@@ -7,7 +7,8 @@ angular.module('ebBackofficeDatatable', ['eb.apiWrapper'])
                 'endpoint': '=',
                 'select': '@',
                 'labels': '@',
-                'fields': '='
+                'fields': '=',
+                'tableClass': '@'
             },
             template: '<div class="table-menu" ng-hide="loading">' +
                 '<select ng-model="perPage">' +
@@ -17,16 +18,16 @@ angular.module('ebBackofficeDatatable', ['eb.apiWrapper'])
                 '</select>' +
                 '<input class="table-filter" type="text" ng-model="filter"/>' +
                 '</div>' +
-                '<table class="datatable" ng-if="fields" ng-hide="loading">' +
+                '<table class="datatable {{tableClass}}" ng-if="fields" ng-hide="loading">' +
                 '<thead>' +
                 '<th></th>' +
-                '<th ng-repeat="label in tabelLabels">{{label}}</th>' +
+                '<th ng-repeat="label in tableLabels">{{label}}</th>' +
                 '<th></th>' +
                 '<thead>' +
                 '<tbody>' +
                 '<tr ng-repeat="row in rows">' +
                 '<td>{{$index + 1 + ((page-1)*perPage)}}</td>' +
-                '<td ng-repeat="col in cols">{{extractColValue(row,col)}}</td>' +
+                '<td ng-repeat="col in fields">{{extractColValue(row,col)}}</td>' +
                 '<td class="action"><button ng-click="edit(row.id)" class="edit"></button></td>' +
                 '</tr>' +
                 '</tbody>' +
@@ -45,61 +46,76 @@ angular.module('ebBackofficeDatatable', ['eb.apiWrapper'])
                 $scope.prevVsisible = false;
                 $scope.nextVisible = false;
 
+                /**
+                * Returns value to be displayed in table
+                * @param <Object> obj               The row's data
+                * @param <Function,String> path     Path to the field in obj to be displayed in current col/row (e.g. values.0.name) 
+                *                                   or function that returns value to be displayed in current col/row
+                */
                 $scope.extractColValue = function (obj, path) {
 
-                    var pathElements = path.split('.');
+                    // Function: take it's return value
+                    if( angular.isFunction( path ) ) { 
+                        return path( obj );
+                    }
 
-                    angular.forEach(pathElements, function (pathElement, index) {
+                    // String: Follow path on obj
+                    else {
 
-                        // check if there are any constraints
-                        var constraint = pathElement.match(/\[(.*?)\]/);
+                        var pathElements = path.split('.');
 
-                        if (constraint) {
+                        angular.forEach(pathElements, function (pathElement, index) {
 
-                            var constraintField = constraint[1].split('=')[0];
-                            var constraintValue = constraint[1].split('=')[1];
-
-                            pathElement = pathElement.substr(0, pathElement.indexOf('['));
-
-                        }
-
-                        if ($.isArray(obj[pathElement])) {
+                            // check if there are any constraints
+                            var constraint = pathElement.match(/\[(.*?)\]/);
 
                             if (constraint) {
 
-                                angular.forEach(obj[pathElement], function (elem) {
+                                var constraintField = constraint[1].split('=')[0];
+                                var constraintValue = constraint[1].split('=')[1];
 
-                                    if (elem[constraintField].toString() === constraintValue) {
-                                        obj = elem;
-                                    }
+                                pathElement = pathElement.substr(0, pathElement.indexOf('['));
 
-                                });
+                            }
+
+                            if ($.isArray(obj[pathElement])) {
+
+                                if (constraint) {
+
+                                    angular.forEach(obj[pathElement], function (elem) {
+
+                                        if (elem[constraintField].toString() === constraintValue) {
+                                            obj = elem;
+                                        }
+
+                                    });
+
+                                } else {
+
+                                    obj = obj[pathElement][ pathElements[index + 1]];
+
+                                }
 
                             } else {
 
-                                obj = obj[pathElement][ pathElements[index + 1]];
+                                if (obj[pathElement] === undefined) {
+                                    return '';
+                                }
 
+                                obj = obj[pathElement];
                             }
 
-                        } else {
+                        });
 
-                            if (obj[pathElement] === undefined) {
-                                return '';
-                            }
+                        return (typeof obj === 'object') ? '' : obj;
 
-                            obj = obj[pathElement];
-                        }
-
-                    });
-
-                    return (typeof obj === 'object') ? '' : obj;
+                    }
 
                 };
 
                 $scope.updateTable = function () {
 
-                    $scope.tabelLabels = $scope.labels.split(',');
-                    $scope.cols = $scope.fields.split(',');
+                    $scope.tableLabels = $scope.labels.split(',');
 
                     var rangeMin = $scope.page * $scope.perPage - $scope.perPage;
                     var rangeMax = $scope.page * $scope.perPage;
@@ -113,7 +129,7 @@ angular.module('ebBackofficeDatatable', ['eb.apiWrapper'])
                     };
 
                     if ($scope.filter) {
-                        config.headers.filter = $scope.cols[0] + '= like(\'%' + $scope.filter + '%\')';
+                        config.headers.filter = $scope.fields[0] + '= like(\'%' + $scope.filter + '%\')';
                     }
 
                     APIWrapperService.request({
