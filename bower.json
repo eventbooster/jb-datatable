@@ -1,6 +1,6 @@
 {
   "name": "jb-datatable",
-  "version": "0.1.3",
+  "version": "0.2.0",
   "main": "src/jb-datatable.js",
   "dependencies": {
     "angular": ">=1.2.0"
@@ -14,7 +14,8 @@
   ],
   "license": "MIT",
   "authors": [
-    "Fabian Schneider"
+    "Fabian Schneider",
+    "Felix Steiner"
   ],
   "repository": {
     "type": "git",
