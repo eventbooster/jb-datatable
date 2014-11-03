@@ -10,7 +10,7 @@ $ bower install jb-datatable
 
 Plugin requires eb-api-wrapper and, of course, angular.
 
-#Usage
+#Usage (Short version)
 
 1. Load ```jb.datatable``` in your angular module definition:
 
@@ -28,17 +28,27 @@ Plugin requires eb-api-wrapper and, of course, angular.
   
   $scope.endpoint   = "/test";
   
+  // Defines the columns to be displayed in table
+  //
   // Get neested fields by using dot syntax: tags.0.name returns row["tags"][0]["name"]
+  // Asterisk prefix (*) makes the field searchable. Please note: The current fluffy version 
+  // does only support **one** column to be searched.
   // TBD: Constraints
-  $scope.fields     = [ "name", "tags.0.name", "startDate", renderEditCell ];
-  
-  // Returns object
-  // key:   filter's name
-  // value: filter to be applied
-  $scope.filters    = {
-      "Upcoming"      : function() {
-          "startDate>" + new Date().getTime()
-      }
+  $scope.fields     = [ "*name", "tags.0.name", "startDate", renderEditCell ];
+ 
+  // Defines entries to be displayed in filter dropdown above table
+  //
+  // Returns an array, consisting of objects with two properties
+  // name:   The filter's name
+  // filter: Filter to be applied to data; maybe a function, has to return a filter string
+  $scope.filterList   	= [ {
+    "name"            : "All"
+    , "filter"        : ""
+  }, {
+    "name"            : "Upcoming"
+    "filter"          : function() {
+      return "startDate>" + new Date().getTime()
+    }
   }
   ```
 
@@ -57,3 +67,10 @@ Plugin requires eb-api-wrapper and, of course, angular.
   ```
   
 Instead of taking the endpoint from the controller, you might use ```endpoint="'/endpoint'"```.
+
+#Usage (Long version)
+
+## Update table's data
+```javascript
+$rootScope.$broadcast( 'reloadDatatableData' );
+```

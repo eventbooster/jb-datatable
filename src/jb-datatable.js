@@ -1,16 +1,17 @@
 angular.module('jb.datatable', ['eb.apiWrapper'])
     
-    .directive('datatable', [ '$compile', '$location', 'APIWrapperService', function ( $compile, $location, APIWrapperService) {
+    .directive('datatable', [ '$compile', '$location', '$rootScope', 'APIWrapperService', function ( $compile, $location, $rootScope, APIWrapperService) {
 
         return {
             restrict: 'EA',
             scope: {
-                'endpoint'  : '=',
-                'select'    : '@',
-                'labels'    : '@',
-                'fields'    : '=',
-                'order'     : '@',
-                'tableClass': '@'
+                'endpoint'        : '='
+                , 'select'        : '@'
+                , 'labels'        : '@'
+                , 'fields'        : '='
+                , 'order'         : '@'
+                , 'tableClass'    : '@' // Class added to <table>
+                , 'filterList'    : '='
             },
             template: '<div class="table-menu" ng-hide="loading">' +
                 '<select ng-model="perPage">' +
@@ -18,7 +19,8 @@ angular.module('jb.datatable', ['eb.apiWrapper'])
                 '<option value="50">50</option>' +
                 '<option value="100">100</option>' +
                 '</select>' +
-                '<input class="table-filter" type="text" ng-model="filter"/>' +
+                '<input class="table-filter" type="text" data-ng-model="textFilter" data-ng-show="showSearch"/>' +
+                '<select data-ng-show="filterList" data-ng-options="filterItem.name as filterItem.name for filterItem in filterList" name="filterList" data-ng-model="listFilter"></select>' +
                 '</div>' +
                 '<table class="datatable {{tableClass}}" ng-if="fields" ng-hide="loading">' +
                 '<thead>' +
@@ -43,6 +45,34 @@ angular.module('jb.datatable', ['eb.apiWrapper'])
                 $scope.perPage = 50;
                 $scope.prevVsisible = false;
                 $scope.nextVisible = false;
+                $scope.showSearch = false;
+
+
+                // Define variables that are used in template
+                $scope.textFilter;
+
+                $scope.showSearch = !!getSearchableColumn( $scope.fields );
+
+
+                /**
+                * Returns the item of $scope.fields that is prefixed with an asterisk
+                */
+                function getSearchableColumn( fields ) {
+
+                    for( var i = 0; i< fields.length; i++ ) {
+
+                        if( !angular.isString( fields[ i ] ) ) {
+                            continue;
+                        }
+
+                        if( fields[ i ].indexOf( "*" ) === 0 ) {
+                            return fields[ i ].substring( 1 );
+                        }
+                    }
+
+                    return false;
+
+                }
 
 
 
@@ -68,13 +98,59 @@ angular.module('jb.datatable', ['eb.apiWrapper'])
                         }
                     };
 
-                    if ($scope.filter) {
-                        config.headers.filter = $scope.fields[0] + '= like(\'%' + $scope.filter + '%\')';
+
+                    // Filters
+                    var filterHeader = [];
+                    if( $scope.textFilter ) {
+
+                        console.log( "Has textFilter; searchable column is %o", searchableColumn );
+                        var searchableColumn = getSearchableColumn( $scope.fields );
+                        if( searchableColumn ) {
+                            filterHeader.push( searchableColumn + '=like(\'%' + $scope.textFilter + '%\')' );
+                        }
                     }
 
+                    if( $scope.listFilter ) {
+                        console.log( "listFilter" );
+                        var selectedListFilter = getListFilter( $scope.listFilter );
+                        if( angular.isFunction( selectedListFilter ) && selectedListFilter() ) {
+                            filterHeader.push( selectedListFilter() );
+                        }
+                        else if( selectedListFilter ) {
+                            filterHeader.push( selectedListFilter );
+                        }
+                        else {
+                            console.log( "seletedListFilter not set" );
+                        }
+                    }
+
+                    if( filterHeader.length > 0 ) {
+                        console.log( "Filters: %o", filterHeader );
+                        config.headers.filter = filterHeader.join( "," );
+                    }
+                    else {
+                        console.log( "No filters" );
+                    }
+
+
+                    function getListFilter( filterName ) {
+                        if( !$scope.filterList ) {
+                            return false;
+                        }
+                        for( var i = 0; i < $scope.filterList.length; i++ ) {
+                            if( $scope.filterList[ i ].name === filterName ) {
+                                return $scope.filterList[ i ].filter;
+                            }
+                        }
+                    }
+
+
+
+
+                    console.log( "Request" );
                     APIWrapperService.request({
                             url: $scope.endpoint,
-                            method: "GET",
+                            method: 'GET',
                             headers: config.headers
                         },
                         {
@@ -86,7 +162,7 @@ angular.module('jb.datatable', ['eb.apiWrapper'])
 
                         function (data) {
 
-                            console.log( "Got data" );
+                            console.log( 'Got data' );
 
                             $scope.loading = false;
 
@@ -98,7 +174,7 @@ angular.module('jb.datatable', ['eb.apiWrapper'])
                         },
                         function (error) {
 
-                            $rootScope.$broadcast('notification', {"type": "error", "message": "web.backoffice.loading.error"});
+                            $rootScope.$broadcast('notification', {'type': 'error', 'message': 'web.backoffice.loading.error'});
 
                         }
 
@@ -127,9 +203,6 @@ angular.module('jb.datatable', ['eb.apiWrapper'])
             link: function (scope, elem, attrs) {
 
 
-
-
-
                 ////////////////////////////////////////////////////////////////////////
                 //
                 // RENDER TABLE
@@ -138,9 +211,9 @@ angular.module('jb.datatable', ['eb.apiWrapper'])
 
 
                 /**
-                * Watch for changes in server data
+                * Watch for changes in server data; re-render table on change
                 */
-                scope.$watch( "rows", function( newData ) {
+                scope.$watch( 'rows', function( newData ) {
                     renderTableContents( newData );
                 } );
 
@@ -157,13 +230,13 @@ angular.module('jb.datatable', ['eb.apiWrapper'])
                 */
                 function renderTableContents( data ) {
 
-                    console.log( "Render table content" );
+                    console.log( 'Render table content' );
         
                     var content = $();
 
                     angular.forEach( data, function( row ) {
 
-                        var tr = $( "<tr></tr>" );
+                        var tr = $( '<tr></tr>' );
 
                         angular.forEach( scope.fields, function( field ) {
 
@@ -176,7 +249,7 @@ angular.module('jb.datatable', ['eb.apiWrapper'])
                                 cellValue = getObjectPropertyFromPath( field, row );
                             }
 
-                            var td = $( "<td>" + cellValue + "</td>" );
+                            var td = $( '<td>' + cellValue + '</td>' );
                             tr.append( td );
                             $compile( td )( scope );
 
@@ -187,7 +260,7 @@ angular.module('jb.datatable', ['eb.apiWrapper'])
                         
                     } );
 
-                    elem.find( "tbody" )
+                    elem.find( 'tbody' )
                         .empty()
                         .append( content );
 
@@ -206,6 +279,10 @@ angular.module('jb.datatable', ['eb.apiWrapper'])
                     var pathElements = path.split('.');
 
                     angular.forEach(pathElements, function (pathElement, index) {
+
+                        if( pathElement.indexOf( "*" ) === 0 ) {
+                            pathElement = pathElement.substring( 1 );
+                        }
 
                         // check if there are any constraints
                         var constraint = pathElement.match(/\[(.*?)\]/);
@@ -255,9 +332,9 @@ angular.module('jb.datatable', ['eb.apiWrapper'])
 
                 /**
                 * Reload table when «reloadDatatableData» is received; call by using
-                * $rootScope.$broadcast( "reloadDatatableData" );
+                * $rootScope.$broadcast( 'reloadDatatableData' );
                 */
-                scope.$on( "reloadDatatableData", function( ev, data ) {
+                scope.$on( 'reloadDatatableData', function( ev, data ) {
                     scope.updateTable();
                 } );
 
@@ -293,7 +370,7 @@ angular.module('jb.datatable', ['eb.apiWrapper'])
                 /**
                  * Watchs the perPage and page. Refresh the datatable.
                  */
-                scope.$watchCollection('[perPage, page, fields, filter]', function (newValue, oldValue) {
+                scope.$watchCollection('[perPage, page, fields, textFilter, listFilter]', function (newValue, oldValue) {
                     if (scope.fields) {
                         scope.updateTable();
                     }
