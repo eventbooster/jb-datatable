@@ -1,3 +1,6 @@
+// TBD: select && x.y.0.z
+// 
+
 'use strict';
 
 angular
@@ -7,11 +10,61 @@ angular
 
 
 
+/**
+* Directive for datatable with filters and search; transcludes the «small» datatable
+*/
+.directive( 'datatableWithFilters', function() {
+    return {
+        transclude      : true
+        , templateUrl   : 'datatableWithFiltersTemplate.html'
+        , controller    : 'DatatableWithFiltersController'
+        , link          : function() {
 
-.directive( 'datatable-with-filters', function() {
-
+        }
+        , scope         : {}
+    };
 } )
-.controller( 'DatatableWithFiltersController', [ '$scope', function( $scope ) {
+
+
+.controller( 'DatatableWithFiltersController', [ '$scope', '$attrs', function( $scope, $attrs ) {
+
+    var self        = this
+        , scope     = $scope.$new();
+
+
+
+
+    //
+    // FILTERS and SEARCH
+    //
+
+    // Selected filters 
+    $scope.filters = {
+        filter      : undefined
+        , search    : undefined
+    };
+
+
+    // Broadcast new searchTerm to table
+    $scope.$watch( 'filters.search', function( newValue ) {
+        $scope.$broadcast( 'search', { searchTerm: newValue } );
+    } );
+
+    // Broadcast filter change to table
+    $scope.$watch( 'filters.filter', function( newValue ) {
+        $scope.$broadcast( 'filter', { filter: newValue } );
+    } );
+
+
+
+    // Items for filterList
+    $scope.filterList = [];
+
+    $attrs.$observe( 'filterList', function() {
+        $scope.filterList = $scope.$parent.$eval( $attrs.filterList );
+    } );
+
+
 
 } ] )
 
@@ -35,15 +88,15 @@ angular
 
     return {
 
-        link: function( scope, element, attrs, datatableController ) {
+        link            : function( scope, element, attrs, DatatableController ) {
 
-            datatableController.init( element );
+            DatatableController.init( element );
 
         }
-        , controller: 'DatatableController'
-        , scope: {} 
+        , controller    : 'DatatableController'
+        , scope         : {}
 
-    }
+    };
 
 } )
 
@@ -53,28 +106,58 @@ angular
         , scope = $scope.$new();
 
 
+    scope.loading = false;
+
+
+    //self.datatableWithFiltersController = undefined;
+
+
     // Pass original scope down to cell where it might be used by
     // rendering functions
     scope.originalScope = $scope.$parent;
 
 
-    /**
-    * Corresponds to directive's link function; render template
-    */
-    this.init = function( element ) {
+    // Pagination stuff
+    self.currentPage        = 0; // Starts with 0
+    self.pageCount          = undefined;
+    self.resultsPerPage     = undefined;
 
-        self.$element = element;
+    // True if there are more results 
+    // -> display paginate-right arrow
+    self.hasMoreResults     = false;
+
+    // Field definitions, may have attributes: 
+    // - content (js function) OR - selector (selects from data)
+    // - title (string; title used in table)
+    // - searchable (bool)
+    self.fields = $scope.fields = [];
 
 
-        // Render template
-        var template    = $templateCache.get( 'datatableTemplate.html' )
-            , rendered  = $compile( template )( scope );
-        
-        self.$element
-            .empty()
-            .append( rendered )
+    // Search
+    self.searchTerm         = undefined;
+    self.filter             = undefined;
 
-    }
+
+    // Sort stuff
+    self.sortField          = $attrs.order || undefined;
+    self.sortOrder          = 'ASC'; // Sort ascending by default
+
+
+
+
+    scope.sortTable = function( field ) {
+        // Sort by field that's already sorted by: 
+        // Switch order
+        if( self.sortField === field ) {
+            self.sortOrder = ( self.sortOrder === 'ASC' ) ? 'DESC' : 'ASC';
+        }
+        else {
+            self.sortField = field;
+            self.sortorder = 'ASC';
+        }
+        self.getData();
+    };
+
 
 
 
@@ -84,21 +167,103 @@ angular
         return $scope.$parent.$eval( $attrs.endpoint ) + $scope.$parent.$eval( $attrs.filter ) + $scope.$parent.$eval( $attrs.order ) + $scope.$parent.$eval( $attrs.fields );
     }, function( newVal ) {
 
-        scope.fields = $scope.$parent.$eval( $attrs.fields );
         self.getData();
 
     } );
 
 
-    // Watch for changes in $scope.label
-    $attrs.$observe( function() {
-        return $scope.$parent.$eval( $attrs.labels ) 
-    }, function( newVal ) {
-        scope.labels = $scope.$parent.$eval( $attrs.labels );
+
+    // Watch fields:
+    // - set self.fields
+    $attrs.$observe( 'fields', function() {
+
+        self.fields         = $scope.$parent.$eval( $attrs.fields );
+
+        // Make titles accessible to html (to render table)
+        scope.fields        = self.fields;
+
+        console.log( 'Datatable: Set fields to %o', self.fields );
+
+        self.getData();
+
     } );
 
 
-    
+
+    // Filter changed on datatableWithFilters: Update data
+    $scope.$on( 'filter', function( ev, args ) {
+        self.filter = args.filter ? args.filter : undefined;
+        self.getData();
+    } );
+
+
+
+
+
+
+
+    // Search term changed in datatableWithFiltersController
+    $scope.$on( 'search', function( ev, args ) {
+        self.searchTerm = args.searchTerm;
+        self.getData();
+    } );
+
+
+
+
+
+    // Paging 
+    this.setResultsPerPage = function( resultsPerPage ) {
+        
+        console.log( "Datatable: Set results per Page" );
+
+        // Update currentPage so that currently displayed results are still visible
+        // in updated table
+        if( self.resultsPerPage ) {
+            self.currentPage = Math.floor( ( self.currentPage * self.resultsPerPage ) / resultsPerPage);
+        }
+
+        self.resultsPerPage = resultsPerPage;
+
+        // Broadcast down the line (to the navigation controller)
+        scope.$broadcast( "resultsPerPageChange", { resultsPerPage: resultsPerPage } );
+        self.getData();
+    };
+
+
+
+    // Change current page
+    this.changePage = function( direction ) {
+
+        if( self.currentPage + direction > -1 ) {
+            self.currentPage += direction;
+            self.getData();
+        }
+
+    };
+
+
+
+    /**
+    * Corresponds to directive's link function; render template
+    */
+    this.init = function( element ) {
+
+        self.$element = element;
+
+        // Render template
+        var template    = $( $templateCache.get( 'datatableTemplate.html' ) );
+        
+        self.$element
+            .empty()
+            .append( template );
+
+        $compile( template )( scope );
+
+    };
+
+
+
 
 
 
@@ -107,13 +272,60 @@ angular
     */
     this.getData = function() {
 
+        scope.loading = true;
+
         // Generate headers
         var headers     = {};
-        /*[ 'select', 'order' ].forEach( function( item ) {
-            headers[ item ] = $attrs[ item ];
-        } );*/
-        headers.order = $attrs.order;
-        headers.select = getSelectFromFields();
+
+        // Order
+        if( self.sortField ) {
+            headers.order = self.sortField + ' ' + self.sortOrder;
+        }
+        
+        // Select
+        headers.select  = getSelectFromFields().join( ',' );
+
+        // Range
+        var rangeStart  = self.currentPage * self.resultsPerPage;
+        // +1: See if there's a next page
+        headers.range   = rangeStart + '-' + ( rangeStart + self.resultsPerPage + 1 );
+
+
+        // Filter
+        if( self.searchTerm || self.filter ) {
+            
+            var filters = [];
+
+
+            // Search
+            if( self.searchTerm ) {
+
+                // Get fields that may be used for search
+                var searchFields = [];
+                for( var i = 0; i < self.fields.length; i++ ) {
+                    if( self.fields[ i ].searchable && self.fields[ i ].selector ) {
+                        searchFields.push( self.fields[ i ].selector );
+                    }
+                }
+
+                if( searchFields.length > 0 ) {
+                    // #todo: serach over multiple fields
+                    filters.push( searchFields[ 0 ] + '=like(\'%' + self.searchTerm +  '%\')' );
+                }
+
+            }
+
+            // Filter
+            if( self.filter ) {
+                filters.push( self.filter );
+            }
+
+            headers.filter = filters.join( ' AND ' );
+            console.error( headers.filter );
+
+        }
+
+
         console.log( 'Datatable: headers are %o', headers );
 
         var url = $scope.$parent.$eval( $attrs.endpoint );
@@ -128,7 +340,20 @@ angular
         .then( function( data ) {
 
             console.log( 'Datatable: Set tableData to %o', data );
+            scope.loading = false;
+
+            // Set hasMoreResults
+            self.hasMoreResults = data.length > self.resultsPerPage ? true : false;
+            if( data.length > self.resultsPerPage ) {
+                data = data.splice( 0, self.resultsPerPage );
+            }
+
+            scope.$broadcast( 'resultsUpdated', { data: data } );
+
             scope.tableData = data;
+
+
+
 
         }, function() {
 
@@ -136,15 +361,58 @@ angular
 
         } );
 
-    }
+    };
 
 
     // Parse fields to find out what select headers we have to set
+    // Returns an array of the relevant rows
     function getSelectFromFields() {
-        return '*';
+        
+        var select = [];
+
+        // Use loop instead of forEach because of continue
+        for( var i = 0; i < self.fields.length; i++ ) {
+
+            var field = self.fields[ i ];
+
+            if( !field || !field.selector || !angular.isString( field.selector ) ) {
+                continue;
+            }
+
+            var rowName = field.selector.replace( /\.\d+\./gi, '.' );
+            select.push( rowName );
+
+        };
+
+        console.log( 'Datatable: Select %o', select );
+        return select;
+
     }
 
 
+    /**
+    * Returns true if table can be ordered by column: 
+    * - selector needs to be set
+    * - selector may contain no dots
+    */
+    $scope.isColumnOrderable = function( selector ) {
+        return selector && selector.indexOf( '.' ) === -1;
+    }
+
+    /**
+    * Checks if table is sorted by selector; returns
+    * - false
+    * - "ASC"
+    * - "DESC"
+    */
+    $scope.isTableOrderedBy = function( selector ) {
+        if( self.sortField === selector ) {
+            return self.sortOrder === "ASC" ? "ASC" : "DESC";
+        }
+        else {
+            return false;
+        }
+    }
 
 } ] )
 
@@ -164,10 +432,10 @@ angular
         , scope         : {}
         , link          : function( $scope, element, attrs, ctrl ) {
             
-            ctrl[ 1 ].init( element, ctrl[ 0 ], ctrl[ 1 ] )
+            ctrl[ 1 ].init( element, ctrl[ 0 ], ctrl[ 1 ] );
 
         }
-    }
+    };
 } )
 
 .controller( 'DatatableBodyController', [ '$scope', '$templateCache', '$compile', function( $scope, $templateCache, $compile ) {
@@ -190,7 +458,7 @@ angular
         // Render rows as soon as element is available
         self.renderRows();
 
-    }
+    };
 
 
 
@@ -209,6 +477,10 @@ angular
             return;
         }
 
+        if( !datatableController ) {
+            return;
+        }
+
         element.empty();
 
         scope.bodyData.forEach( function( row ) {
@@ -219,15 +491,15 @@ angular
             var rowScope = $scope.$new();
             rowScope.data = row;
             rowScope.originalScope = $scope.$parent.originalScope;
-            rowScope.fields = $scope.$parent.fields;
+            rowScope.fields = datatableController.fields;
+            //console.error( 'pass $scope to row: ctrl %o, fields %o; roScope %o', datatableController, datatableController.fields, rowScope );
 
-            var renderedRow = $compile( template )( rowScope );
-
-            element.append( renderedRow );
+            var rendered = $compile( template )( rowScope );
+            element.append( rendered );
 
         } );
 
-    }
+    };
 
 } ] )
 
@@ -242,27 +514,30 @@ angular
 */
 .directive( 'datatableRow', function() {
     return {
+        // We can't use require here as parent controllers won't be available
+        // (because html code is appended to document dynamically)
         link            : function( $scope, element, attrs, ctrl ) {
-            ctrl.init( element );
+
+            var datatableRowController          = ctrl;
+            datatableRowController.init( element );
+
         }
         , controller    : 'DatatableRowController'
         , scope         : {}
-    }
+    };
 } )
 
-.controller( 'DatatableRowController', [ '$scope', '$templateCache', '$compile', function( $scope, $templateCache, $compile ) {
+.controller( 'DatatableRowController', [ '$scope', '$templateCache', '$compile', '$attrs', function( $scope, $templateCache, $compile, $attrs ) {
 
-    var self        = this;
-
+    var self            = this;
+    
     // Define variables
-    self.data;
-    self.fields;
-    self.$element;
+    self.data           = undefined;
+    self.$element       = undefined;
+
 
     // On change of data or fields update cells
     $scope.$watchGroup( [ '$parent.data', '$parent.fields' ], function() {
-
-        self.renderCells();
 
         self.data       = $scope.$parent.data;
         self.fields     = $scope.$parent.fields;
@@ -276,16 +551,22 @@ angular
     this.init = function( element ) {
         self.$element = element;
         self.renderCells();
-    }
+    };
 
     // Renders cells with their new scope
     this.renderCells = function() {
 
+        if( !self.fields || !self.fields.length ) {
+            return;
+        }
+
         if( !angular.isArray( self.fields ) ) {
+            console.warn( 'Datatable: self.fields is not an array in row: %o', self.fields )
             return;
         }
 
         if( !self.$element ) {
+            console.warn( 'Datatable: Can\'t render row, $element is missing' );
             return;
         }
 
@@ -305,7 +586,7 @@ angular
 
         } );
 
-    }
+    };
 
 } ] )
 
@@ -325,7 +606,7 @@ angular
         , link      : function( scope, element, attrs, ctrl  ) {
             ctrl.init( element );
         }
-    }
+    };
 
 } )
 
@@ -333,7 +614,7 @@ angular
 
     var self        = this;
 
-    self.$element;
+    self.$element   = undefined;
 
 
     $scope.$watchGroup( [ 'data', 'field' ], function() {
@@ -341,19 +622,17 @@ angular
     } );
 
 
-
     this.init = function( element ) {
 
         self.$element = element;
         self.renderCellContent();
 
-    }
+    };
 
 
     this.renderCellContent = function() {
 
-        var content = getDataByField( $scope.data, $scope.field )
-        console.error( $scope.originalScope );
+        var content = getDataByField( $scope.data, $scope.field );
 
         self.$element
             .empty()
@@ -363,9 +642,9 @@ angular
             // the angular Sanitizer.
             // Compile against the originalScope so that one may use $scope in the fields
             // definition for ng-click etc.
-            .append( $compile( '<span>' + content + '</span>' )( $scope.originalScope ) ); 
+            .append( $compile( '<span>' + content + '</span>' )( $scope.originalScope ) );
 
-    }
+    };
 
 
 
@@ -378,20 +657,28 @@ angular
     */
     function getDataByField( data, field ) {
 
-        if( angular.isFunction( field ) ) {
-            return field( data );
+        // Field content is a function
+        if( field.content && angular.isFunction( field.content ) ) {
+            return field.content( data );
+        }
+
+        // Stuff missing
+        if( !field || !data || !field.selector ) {
+            console.error( 'Can\'t render cell content; data, field or selector missing in %o/%o', data, field );
+            return false;
         }
 
 
         // Holds data of last parsed field
         var fieldData   = data
-            , paths     = field.split( '.' )
+
+        // Single path (selector) elements
+            , paths     = field.selector.split( '.' )
             , result;
 
         for( var i = 0; i < paths.length; i++ ) {
 
             var currentPath = paths[ i ];
-            console.log( "Find %o in %o", currentPath, fieldData );
 
             // Property is missing
             if( !fieldData[ currentPath ] ) {
@@ -426,13 +713,12 @@ angular
 
         }
 
-        console.error( "result: %o", result );
         return result;
             
     }
 
 
-} ] ) 
+} ] )
 
 
 
@@ -452,8 +738,12 @@ angular
     return {
         link: function( $scope, element, attrs ) {
 
+            function pad( nr ) {
+                return nr < 10 ? '0' + nr : nr;
+            }
+
             var format = attrs.dateFormat
-                , date = new Date( attrs.date )
+                , date = new Date( attrs.date );
 
             var tableDate = format
                 .replace( 'YYYY', date.getFullYear() )
@@ -463,20 +753,106 @@ angular
 
                 .replace( 'hh', pad( date.getHours() ) )
                 .replace( 'mm', pad( date.getMinutes() ) )
-                .replace( 'ss', pad( date.getSeconds() ) )
+                .replace( 'ss', pad( date.getSeconds() ) );
     
             element
                 .empty()
-                .append( tableDate )
-
-            function pad( nr ) {
-                return nr < 10 ? '0' + nr : nr;
-            }
+                .append( tableDate );
 
         }
-    }
+    };
 
 } )
+
+
+
+
+
+
+/**
+* Directive to navigate through the datatable
+*/
+.directive( 'datatableNavigation', function() {
+
+    return {
+        require         : [ 'datatableNavigation', '^datatable' ]
+        , controller    : 'DatatableNavigationController'
+        , replace       : true
+        , templateUrl   : 'datatableNavigationTemplate.html'
+        , link          : function( $scope, element, attrs, ctrl ) {
+
+            var navigationController    = ctrl[ 0 ]
+                , datatableController   = ctrl[ 1 ];
+
+            navigationController.init( element, datatableController );
+
+        }
+    };
+
+} )
+
+.controller( 'DatatableNavigationController', [ '$scope', function( $scope ) {
+
+    var self = this;
+    self.datatableController    = undefined;
+
+
+    // Needs to be in object for UI binding
+    $scope.paging = {
+        resultsPerPage  : 10
+        , showLeft      : true
+        , showRight     : true
+    };
+
+
+    $scope.$watch( 'paging.resultsPerPage', function( newValue ) {
+
+        // Datatable controller not yet ready
+        if( !self.datatableController ) {
+            return;
+        }
+
+        self.datatableController.setResultsPerPage( parseInt( newValue, 10 ) );
+
+    } );
+
+
+    // Results per page changed: Sync back – done on resultsUpdated as well
+    /*$scope.$on( 'resultsPerPageChange', function( ev, args ) {
+        $scope.paging.resultsPerPage = args.resultsPerPage;
+    } );*/
+
+
+    // New data gotten from server
+    $scope.$on( 'resultsUpdated', function( ev, args ) {
+
+        if( !self.datatableController ) {
+            return;
+        }
+
+        $scope.paging.showRight         = self.datatableController.hasMoreResults;
+        $scope.paging.showLeft          = self.datatableController.currentPage > 0;
+        $scope.paging.resultsPerPage    = self.datatableController.resultsPerPage;
+
+    } );
+
+
+
+    $scope.changePage = function( direction ) {
+
+        self.datatableController.changePage( direction );
+
+    };
+
+
+    this.init = function( element, datatableController ) {
+
+        self.datatableController = datatableController;
+
+    };
+
+
+} ] )
 
 
 
@@ -487,25 +863,64 @@ angular
 */
 .run( function( $templateCache ) {
 
-    $templateCache.put( 'datatableTemplate.html', 
-          '<table class=\'table\'>'
-        + '<thead>'
-        + '<tr>'
-        + '<th data-ng-repeat=\'label in labels\'>{{label}}</th>'
-        + '</tr>'
-        + '</thead>'
-        + '<tbody data-datatable-body>'
-        + '</tbody>'
-        + '</table>'
-    )
+    $templateCache.put( 'datatableWithFiltersTemplate.html',
+        '<form class=\'form-inline\'>' +
+            '<input type=\'text\' class=\'form-control\' data-ng-model=\'filters.search\' />' +
+            '<select data-ng-show=\'filterList && filterList.length > 0\' name=\'datatable-filter-select\' class=\'form-control\' data-ng-model=\'filters.filter\' data-ng-options=\'filter.filter as filter.name for filter in filterList\'></select>' +
+            '<div data-ng-transclude></div>' +
+        '</form>'
+    );
 
-    $templateCache.put( 'datatableRowTemplate.html', 
-          '<tr data-datatable-row></tr>'
-    )
+    $templateCache.put( 'datatableTemplate.html',
 
-    $templateCache.put( 'datatableCellTemplate.html', 
-          '<td data-datatable-cell>'
-        + '</td>'
-    )
+        // Progress
+        '<div class=\'progress\' data-ng-if=\'loading\'>' +
+            '<div class=\'progress-bar progress-bar-striped active\' role=\'progressbar\' style=\'width:100%\'></div>' +
+        '</div>' +
+
+        // Table
+        '<table class=\'table\' data-ng-if=\'!loading\'>' + // Use bootstrap table class
+            '<thead>' +
+                '<tr>' +
+                    '<th data-ng-repeat=\'field in fields\'>' +
+                        //Display button only for fields from database that are sortable
+                        '<button class=\'btn btn-link\' data-ng-if=\'isColumnOrderable( field.selector )\' data-ng-click=\'sortTable(field.selector)\'>' +
+                            '{{field.title}}' + 
+                            '<span data-ng-if=\'isTableOrderedBy( field.selector ) === \"ASC\"\'>&darr;</span>' +
+                            '<span data-ng-if=\'isTableOrderedBy( field.selector ) === \"DESC\"\'>&uarr;</span>' +
+                        '</button>' +
+                        // Non orderable
+                        '<span data-ng-if=\'!isColumnOrderable( field.selector )\'>{{field.title}}<span>' + 
+                    '</th>' +
+                '</tr>' +
+            '</thead>' +
+            '<tbody data-datatable-body>' +
+            '</tbody>' +
+        '</table>' +
+
+        // Navigation
+        '<nav data-datatable-navigation></nav>'
+    
+    );
+
+    $templateCache.put( 'datatableNavigationTemplate.html',
+        '<nav>' + // Give the navigation it's own directive
+            '<form class=\'form-inline\' data-ng-if=\'tableData\'>' + // Needed for bootstrap inline form
+                '<button class=\'btn btn-link\' data-ng-click=\'changePage(-1)\' data-ng-show=\'paging.showLeft\'>&larr;</button>' +
+                '<button class=\'btn btn-link\' data-ng-click=\'changePage(1)\' data-ng-show=\'paging.showRight\'>&rarr;</button>' +
+                '<select name=\'resultsPerPage\' data-ng-model=\'paging.resultsPerPage\' class=\'form-control input-sm\'><option>10</option><option>25</option><option>50</option><option>100</option></select>' +
+            '</form>' +
+        '</nav>'
+
+    );
+
+    $templateCache.put( 'datatableRowTemplate.html',
+        '<tr data-datatable-row data-fields=\'fields\'></tr>'
+    );
+
+    $templateCache.put( 'datatableCellTemplate.html',
+        '<td data-datatable-cell>' +
+        '</td>'
+    );
 
 } );

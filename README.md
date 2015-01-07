@@ -1,4 +1,10 @@
-The angular datatable directive for fluffy back offices.
+The angular datatable directive for fluffy back offices. 
+
+#Features
+
+- Sort, pagination, search (only by one column for now)
+- Chose from predefined filters (e.g. «All articles with a price > $100»)
+- Auto-detects the fields for the select header
 
 #Installation
 
@@ -15,39 +21,53 @@ Plugin requires eb-api-wrapper and, of course, angular.
 1. Load ```jb.datatable``` in your angular module definition:
 
   ```javascript
-  angular.module( "myModule", [ "jb.datatable" ] );
+  angular.module( 'myModule', [ 'jb.datatable' ] );
   ```
   
 1. Set the necessary variables in your controller
 
   ```javascript
+  // Custom function to be rendered in a cell; will be referenced in $scope.fields
   // The only argument passed is the row's data fetched from server
   function renderEditCell( data ) {
-    return "<button data-ng-click='$parent.editField(" + data.id + ")>Edit</button>";
+    return '<button data-ng-click='$parent.editField(' + data.id + ')>Edit</button>';
   }
   
-  $scope.endpoint   = "/test";
+  // Endpoint to be fetched
+  $scope.endpoint   = '/test';
   
-  // Defines the columns to be displayed in table
+  // Define the columns to be displayed in table
   //
-  // Get neested fields by using dot syntax: tags.0.name returns row["tags"][0]["name"]
-  // Asterisk prefix (*) makes the field searchable. Please note: The current fluffy version 
-  // does only support **one** column to be searched.
   // TBD: Constraints
-  $scope.fields     = [ "*name", "tags.0.name", "startDate", renderEditCell ];
+  $scope.fields     = [ {
+    // Name of column to be displayed in table header
+    title           : 'ID' 
+    // Path that the row's data will be searched for
+    , selector      : 'id' 
+  }, {
+    title           : 'First Tag'
+    // A more complex path; returns row['tags'][0]['name']
+    , selector      : tags.0.name
+  }, {
+    title           : 'Edit'
+    // Pass a function; it's return value will be displayed in the
+    // cell
+    , content       : renderEditCell
+  }
+  ]
  
   // Defines entries to be displayed in filter dropdown above table
   //
   // Returns an array, consisting of objects with two properties
   // name:   The filter's name
   // filter: Filter to be applied to data; maybe a function, has to return a filter string
-  $scope.filterList   	= [ {
-    "name"            : "All"
-    , "filter"        : ""
+  $scope.filterList       = [ {
+    'name'            : 'All'
+    , 'filter'        : ''
   }, {
-    "name"            : "Upcoming"
-    "filter"          : function() {
-      return "startDate>" + new Date().getTime()
+    'name'            : 'Upcoming'
+    'filter'          : function() {
+      return 'startDate>' + new Date().getTime()
     }
   }
   ```
@@ -57,13 +77,9 @@ Plugin requires eb-api-wrapper and, of course, angular.
   ```html
   <div data-datatable 
         endpoint="endpoint"
-        labels="Name,Amount,Start,Edit"
-        select="*"
-        order="name"
-        table-class="table"
         fields="fields"
-        filter="filter"
-        class="datatable" ></div>
+        order="name" <!-- ASC by default -->
+        filter="filter"></div>
   ```
   
 Instead of taking the endpoint from the controller, you might use ```endpoint="'/endpoint'"```.
