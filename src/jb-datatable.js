@@ -1,6 +1,3 @@
-// TBD: select && x.y.0.z
-// 
-
 'use strict';
 
 angular
