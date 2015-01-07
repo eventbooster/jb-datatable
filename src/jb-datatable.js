@@ -1,383 +1,511 @@
-angular.module('jb.datatable', ['eb.apiWrapper'])
-    
-    .directive('datatable', [ '$compile', '$location', '$rootScope', 'APIWrapperService', function ( $compile, $location, $rootScope, APIWrapperService) {
+'use strict';
 
-        return {
-            restrict: 'EA',
-            scope: {
-                'endpoint'        : '='
-                , 'select'        : '@'
-                , 'labels'        : '@'
-                , 'fields'        : '='
-                , 'order'         : '@'
-                , 'tableClass'    : '@' // Class added to <table>
-                , 'filterList'    : '='
-            },
-            template: '<div class="table-menu" ng-hide="loading">' +
-                '<select ng-model="perPage">' +
-                '<option value="10">10</option>' +
-                '<option value="50">50</option>' +
-                '<option value="100">100</option>' +
-                '</select>' +
-                '<input class="table-filter" type="text" data-ng-model="textFilter" data-ng-show="showSearch"/>' +
-                '<select data-ng-show="filterList" data-ng-options="filterItem.name as filterItem.name for filterItem in filterList" name="filterList" data-ng-model="listFilter"></select>' +
-                '</div>' +
-                '<table class="datatable {{tableClass}}" ng-if="fields" ng-hide="loading">' +
-                '<thead>' +
-                '<th ng-repeat="label in tableLabels">{{label}}</th>' +
-                '<th></th>' +
-                '<thead>' +
-                '<!-- Content will be added here through link function -->' +
-                '<tbody>' +
-                '</tbody>' +
-                '</table>' +
-                '<button class="prev" ng-click="prev()" ng-show="prevVisible">Previous</button>' +
-                '<button class="next" ng-click="next()" ng-show="nextVisible">Next</button>' +
-                '<div class="no-entries notification" ng-show="!hasEntries() && !loading" tabindex="web.backoffice.datatable.notentries"></div>' +
-                '<div class="progress progress-striped active"  ng-show="loading">' +
-                '<div class="progress-bar progress-bar" role="progressbar" aria-valuenow="80" aria-valuemin="0" aria-valuemax="100" style="width: 100%" translate="web.backoffice.loading"></div>' +
-                '</div>',
-
-            controller: function ($scope, $http) {
-
-                $scope.loading = true;
-                $scope.page = 1;
-                $scope.perPage = 50;
-                $scope.prevVsisible = false;
-                $scope.nextVisible = false;
-                $scope.showSearch = false;
-
-
-                // Define variables that are used in template
-                $scope.textFilter;
-
-                $scope.showSearch = !!getSearchableColumn( $scope.fields );
-
-
-                /**
-                * Returns the item of $scope.fields that is prefixed with an asterisk
-                */
-                function getSearchableColumn( fields ) {
-
-                    for( var i = 0; i< fields.length; i++ ) {
-
-                        if( !angular.isString( fields[ i ] ) ) {
-                            continue;
-                        }
-
-                        if( fields[ i ].indexOf( "*" ) === 0 ) {
-                            return fields[ i ].substring( 1 );
-                        }
-                    }
-
-                    return false;
-
-                }
-
-
-
-                /**
-                * Get new data from server, store in $scope.rows
-                * Called on change of perPage, page, fields etc.
-                */
-                $scope.updateTable = function () {
-
-                    console.log( "Update table" );
-
-                    $scope.tableLabels = $scope.labels.split(',');
-
-                    var rangeMin = $scope.page * $scope.perPage - $scope.perPage;
-                    var rangeMax = $scope.page * $scope.perPage;
-                    var range = rangeMin + '-' + rangeMax;
-
-                    var config = {
-                        headers: {
-                            range: range,
-                            select: $scope.select,
-                            order: $scope.order
-                        }
-                    };
-
-
-                    // Filters
-                    var filterHeader = [];
-                    if( $scope.textFilter ) {
-
-                        console.log( "Has textFilter; searchable column is %o", searchableColumn );
-                        var searchableColumn = getSearchableColumn( $scope.fields );
-                        if( searchableColumn ) {
-                            filterHeader.push( searchableColumn + '=like(\'%' + $scope.textFilter + '%\')' );
-                        }
-                    }
-
-                    if( $scope.listFilter ) {
-                        console.log( "listFilter" );
-                        var selectedListFilter = getListFilter( $scope.listFilter );
-                        if( angular.isFunction( selectedListFilter ) && selectedListFilter() ) {
-                            filterHeader.push( selectedListFilter() );
-                        }
-                        else if( selectedListFilter ) {
-                            filterHeader.push( selectedListFilter );
-                        }
-                        else {
-                            console.log( "seletedListFilter not set" );
-                        }
-                    }
-
-                    if( filterHeader.length > 0 ) {
-                        console.log( "Filters: %o", filterHeader );
-                        config.headers.filter = filterHeader.join( "," );
-                    }
-                    else {
-                        console.log( "No filters" );
-                    }
-
-
-                    function getListFilter( filterName ) {
-                        if( !$scope.filterList ) {
-                            return false;
-                        }
-                        for( var i = 0; i < $scope.filterList.length; i++ ) {
-                            if( $scope.filterList[ i ].name === filterName ) {
-                                return $scope.filterList[ i ].filter;
-                            }
-                        }
-                    }
+angular
+.module( 'jb.datatable', [ 'eb.apiWrapper' ] )
 
 
 
 
-                    console.log( "Request" );
-                    APIWrapperService.request({
-                            url: $scope.endpoint,
-                            method: 'GET',
-                            headers: config.headers
-                        },
-                        {
-                            returnProperty: function (resp) {
-                                return resp;
-                            }
-                        })
-                        .then(
-
-                        function (data) {
-
-                            console.log( 'Got data' );
-
-                            $scope.loading = false;
-
-                            $scope.rows = data;
-
-                            $scope.prevVisible = $scope.page > 1;
-                            $scope.nextVisible = data.length >= $scope.perPage;
-
-                        },
-                        function (error) {
-
-                            $rootScope.$broadcast('notification', {'type': 'error', 'message': 'web.backoffice.loading.error'});
-
-                        }
-
-                    );
-                };
-
-                $scope.setRange = function (callback) {
-                    var rangeMin = $scope.page * $scope.perPage - $scope.perPage;
-                    var rangeMax = $scope.page * $scope.perPage;
-
-                    $http.defaults.headers.get.range = rangeMin + '-' + rangeMax;
-
-                    if (callback) {
-                        callback();
-                    }
-                };
-
-                $scope.hasEntries = function () {
-                    if ($scope.rows && $scope.rows.length > 0) {
-                        return true;
-                    }
-                    return false;
-                };
-
-            },
-            link: function (scope, elem, attrs) {
 
 
-                ////////////////////////////////////////////////////////////////////////
-                //
-                // RENDER TABLE
-                //
-                ////////////////////////////////////////////////////////////////////////
+.directive( 'datatable-with-filters', function() {
+
+} )
+.controller( 'DatatableWithFiltersController', [ '$scope', function( $scope ) {
+
+} ] )
 
 
-                /**
-                * Watch for changes in server data; re-render table on change
-                */
-                scope.$watch( 'rows', function( newData ) {
-                    renderTableContents( newData );
-                } );
 
 
-                /**
-                * Render content of $scope.rows in table (<tr><td> etc.)
-                *
-                * We can't use: 
-                * - Bindings, as they won't compile their content; e.g. click handlers won't be called
-                * - A ng-bind-html-and-compile directive as it's watcher will not perform well 
-                *   (See http://stackoverflow.com/questions/17417607/angular-ng-bind-html-unsafe-and-directive-within-it)
-                *
-                * @param <Object> data      Data as gotten from server
-                */
-                function renderTableContents( data ) {
 
-                    console.log( 'Render table content' );
+
+
+
+
+
+
+
+
+
+/**
+* Directive to render table (without filter inputs etc.)
+*/
+.directive( 'datatable', function() {
+
+    return {
+
+        link: function( scope, element, attrs, datatableController ) {
+
+            datatableController.init( element );
+
+        }
+        , controller: 'DatatableController'
+        , scope: {} 
+
+    }
+
+} )
+
+.controller( 'DatatableController', [ '$scope', '$rootScope', '$attrs', '$templateCache', '$compile', 'APIWrapperService', function( $scope, $rootScope, $attrs, $templateCache, $compile, APIWrapperService ) {
+
+    var self    = this
+        , scope = $scope.$new();
+
+
+    // Pass original scope down to cell where it might be used by
+    // rendering functions
+    scope.originalScope = $scope.$parent;
+
+
+    /**
+    * Corresponds to directive's link function; render template
+    */
+    this.init = function( element ) {
+
+        self.$element = element;
+
+
+        // Render template
+        var template    = $templateCache.get( 'datatableTemplate.html' )
+            , rendered  = $compile( template )( scope );
         
-                    var content = $();
+        self.$element
+            .empty()
+            .append( rendered )
 
-                    angular.forEach( data, function( row ) {
-
-                        var tr = $( '<tr></tr>' );
-
-                        angular.forEach( scope.fields, function( field ) {
-
-                            var cellValue;
-
-                            if( angular.isFunction( field ) ) {
-                                cellValue = field( row );
-                            }
-                            else {
-                                cellValue = getObjectPropertyFromPath( field, row );
-                            }
-
-                            var td = $( '<td>' + cellValue + '</td>' );
-                            tr.append( td );
-                            $compile( td )( scope );
-
-
-                        } );
-
-                        content = content.add( tr );
-                        
-                    } );
-
-                    elem.find( 'tbody' )
-                        .empty()
-                        .append( content );
-
-                }
+    }
 
 
 
-                /**
-                * Returns a property from obj defined by path (like xPath): 
-                * @param <String> path      Path definition, e.g. "address.0.firstName"
-                *                           TBD: How may paths look like?
-                * @param <String> obj       Object to retreive property from
-                */
-                function getObjectPropertyFromPath( path, obj ) {
+    // Watch for endpoint, order or filter to change: 
+    // call getData()
+    $attrs.$observe( function() {
+        return $scope.$parent.$eval( $attrs.endpoint ) + $scope.$parent.$eval( $attrs.filter ) + $scope.$parent.$eval( $attrs.order ) + $scope.$parent.$eval( $attrs.fields );
+    }, function( newVal ) {
 
-                    var pathElements = path.split('.');
+        scope.fields = $scope.$parent.$eval( $attrs.fields );
+        self.getData();
 
-                    angular.forEach(pathElements, function (pathElement, index) {
-
-                        if( pathElement.indexOf( "*" ) === 0 ) {
-                            pathElement = pathElement.substring( 1 );
-                        }
-
-                        // check if there are any constraints
-                        var constraint = pathElement.match(/\[(.*?)\]/);
-
-                        if (constraint) {
-
-                            var constraintField = constraint[1].split('=')[0];
-                            var constraintValue = constraint[1].split('=')[1];
-
-                            pathElement = pathElement.substr(0, pathElement.indexOf('['));
-
-                        }
-
-                        if ($.isArray(obj[pathElement])) {
-
-                            if (constraint) {
-
-                                angular.forEach(obj[pathElement], function (elem) {
-
-                                    if (elem[constraintField].toString() === constraintValue) {
-                                        obj = elem;
-                                    }
-
-                                });
-
-                            } else {
-
-                                obj = obj[pathElement][ pathElements[index + 1]];
-
-                            }
-
-                        } else {
-
-                            if (obj[pathElement] === undefined) {
-                                return '';
-                            }
-
-                            obj = obj[pathElement];
-                        }
-
-                    });
-
-                    return (typeof obj === 'object') ? '' : obj;
-
-                }
+    } );
 
 
-                /**
-                * Reload table when «reloadDatatableData» is received; call by using
-                * $rootScope.$broadcast( 'reloadDatatableData' );
-                */
-                scope.$on( 'reloadDatatableData', function( ev, data ) {
-                    scope.updateTable();
-                } );
+    // Watch for changes in $scope.label
+    $attrs.$observe( function() {
+        return $scope.$parent.$eval( $attrs.labels ) 
+    }, function( newVal ) {
+        scope.labels = $scope.$parent.$eval( $attrs.labels );
+    } );
 
 
-                /**
-                 * Routes to edit page.
-                 * @param id
-                 */
-                scope.edit = function (id) {
-                    $location.path($location.path() + '/' + id);
-                };
+    
 
-                /**
-                 * Loads previous page.
-                 */
-                scope.prev = function () {
-                    if (scope.page > 1) {
-                        scope.prevVisible = false;
-                        scope.page--;
-                    }
-                };
 
-                /**
-                 * Loads next page.
-                 */
-                scope.next = function () {
-                    if (scope.rows.length >= scope.perPage) {
-                        scope.nextVisible = false;
-                        scope.page++;
-                    }
-                };
 
-                /**
-                 * Watchs the perPage and page. Refresh the datatable.
-                 */
-                scope.$watchCollection('[perPage, page, fields, textFilter, listFilter]', function (newValue, oldValue) {
-                    if (scope.fields) {
-                        scope.updateTable();
-                    }
-                });
+    /**
+    * Gets data from server
+    */
+    this.getData = function() {
+
+        // Generate headers
+        var headers     = {};
+        /*[ 'select', 'order' ].forEach( function( item ) {
+            headers[ item ] = $attrs[ item ];
+        } );*/
+        headers.order = $attrs.order;
+        headers.select = getSelectFromFields();
+        console.log( 'Datatable: headers are %o', headers );
+
+        var url = $scope.$parent.$eval( $attrs.endpoint );
+        console.log( 'Datatable: call URL %o', url );
+
+        // Call
+        APIWrapperService.request( {
+            url         : url
+            , method    : 'GET'
+            , headers   : headers
+        } )
+        .then( function( data ) {
+
+            console.log( 'Datatable: Set tableData to %o', data );
+            scope.tableData = data;
+
+        }, function() {
+
+            $rootScope.$broadcast( 'notification', { 'type': 'error', 'message': 'web.backoffice.loading.error' } );
+
+        } );
+
+    }
+
+
+    // Parse fields to find out what select headers we have to set
+    function getSelectFromFields() {
+        return '*';
+    }
+
+
+
+} ] )
+
+
+
+
+
+
+/**
+* Directive to render datatable's <tbody> (containing al <tr>s)
+*/
+.directive( 'datatableBody', function() {
+    return {
+        templateUrl     : 'datatableRowTemplate.html'
+        , controller    : 'DatatableBodyController'
+        , require       : ['^datatable', 'datatableBody' ]
+        , scope         : {}
+        , link          : function( $scope, element, attrs, ctrl ) {
+            
+            ctrl[ 1 ].init( element, ctrl[ 0 ], ctrl[ 1 ] )
+
+        }
+    }
+} )
+
+.controller( 'DatatableBodyController', [ '$scope', '$templateCache', '$compile', function( $scope, $templateCache, $compile ) {
+
+    var scope   = $scope.$new()
+        , self  = this;
+
+    scope.bodyData = [];
+
+
+    var element
+        , datatableController;
+
+
+    this.init = function( el, dtController, datatableBodyController ) {
+
+        element = el;
+        datatableController = dtController;
+
+        // Render rows as soon as element is available
+        self.renderRows();
+
+    }
+
+
+
+    // Watch for changes in tableData; render row (as soon as element is available)
+    $scope.$watch( '$parent.tableData', function() {
+        scope.bodyData = $scope.$parent.tableData;
+        console.log( 'Datatable: bodyData is %o', scope.bodyData );
+        self.renderRows();
+    } );
+
+
+
+    this.renderRows = function() {
+
+        if( !element || !scope.bodyData ) {
+            return;
+        }
+
+        element.empty();
+
+        scope.bodyData.forEach( function( row ) {
+            
+            var template = $templateCache.get( 'datatableRowTemplate.html' );
+
+            // Generate new scope for row
+            var rowScope = $scope.$new();
+            rowScope.data = row;
+            rowScope.originalScope = $scope.$parent.originalScope;
+            rowScope.fields = $scope.$parent.fields;
+
+            var renderedRow = $compile( template )( rowScope );
+
+            element.append( renderedRow );
+
+        } );
+
+    }
+
+} ] )
+
+
+
+
+
+
+
+/**
+* Directive to render a datatable's row and it's contents
+*/
+.directive( 'datatableRow', function() {
+    return {
+        link            : function( $scope, element, attrs, ctrl ) {
+            ctrl.init( element );
+        }
+        , controller    : 'DatatableRowController'
+        , scope         : {}
+    }
+} )
+
+.controller( 'DatatableRowController', [ '$scope', '$templateCache', '$compile', function( $scope, $templateCache, $compile ) {
+
+    var self        = this;
+
+    // Define variables
+    self.data;
+    self.fields;
+    self.$element;
+
+    // On change of data or fields update cells
+    $scope.$watchGroup( [ '$parent.data', '$parent.fields' ], function() {
+
+        self.renderCells();
+
+        self.data       = $scope.$parent.data;
+        self.fields     = $scope.$parent.fields;
+
+        self.renderCells();
+
+    } );
+
+
+    // Called by link function
+    this.init = function( element ) {
+        self.$element = element;
+        self.renderCells();
+    }
+
+    // Renders cells with their new scope
+    this.renderCells = function() {
+
+        if( !angular.isArray( self.fields ) ) {
+            return;
+        }
+
+        if( !self.$element ) {
+            return;
+        }
+
+        self.$element.empty();
+
+        self.fields.forEach( function( cellField ) {
+
+            var cellScope           = $scope.$new();
+            cellScope.field         = cellField;
+            cellScope.data          = self.data;
+            cellScope.originalScope = $scope.$parent.originalScope;
+
+            var template    = $templateCache.get( 'datatableCellTemplate.html' )
+                , rendered  = $compile( template )( cellScope );
+
+            self.$element.append( rendered );
+
+        } );
+
+    }
+
+} ] )
+
+
+
+
+
+
+
+/**
+* Directive for a single cell
+*/
+.directive( 'datatableCell', function() {
+
+    return {
+        controller  : 'DatatableCellController'
+        , link      : function( scope, element, attrs, ctrl  ) {
+            ctrl.init( element );
+        }
+    }
+
+} )
+
+.controller( 'DatatableCellController', [ '$scope', '$compile', '$templateCache', function( $scope, $compile, $templateCache ) {
+
+    var self        = this;
+
+    self.$element;
+
+
+    $scope.$watchGroup( [ 'data', 'field' ], function() {
+        self.renderCellContent();
+    } );
+
+
+
+    this.init = function( element ) {
+
+        self.$element = element;
+        self.renderCellContent();
+
+    }
+
+
+    this.renderCellContent = function() {
+
+        var content = getDataByField( $scope.data, $scope.field )
+        console.error( $scope.originalScope );
+
+        self.$element
+            .empty()
+
+            // Span's needed as angular won't compile without an enclosing tag
+            // Don't use a proper template, as we'd need data-ng-bind-html and therefore
+            // the angular Sanitizer.
+            // Compile against the originalScope so that one may use $scope in the fields
+            // definition for ng-click etc.
+            .append( $compile( '<span>' + content + '</span>' )( $scope.originalScope ) ); 
+
+    }
+
+
+
+    /*
+    * «xpath» for objects. Returns result found in data for a certain path «field».
+    * field may be 
+    * - name1.name2.name3   for { name1: { name2: { name3: } } }
+    * - name.0.content      for { name1: [ { content: } ] }
+    * - name=test.content   for { name: test, content: { } }
+    */
+    function getDataByField( data, field ) {
+
+        if( angular.isFunction( field ) ) {
+            return field( data );
+        }
+
+
+        // Holds data of last parsed field
+        var fieldData   = data
+            , paths     = field.split( '.' )
+            , result;
+
+        for( var i = 0; i < paths.length; i++ ) {
+
+            var currentPath = paths[ i ];
+            console.log( "Find %o in %o", currentPath, fieldData );
+
+            // Property is missing
+            if( !fieldData[ currentPath ] ) {
+                console.log( 'prop missing' );
+                result = false;
+                break;
+            }
+
+
+            // fieldData[ currentPath ] is object or array
+            if( angular.isObject( fieldData[ currentPath ] ) || angular.isArray( fieldData[ currentPath ] ) ) {
+
+                fieldData = fieldData[ currentPath ];
+                continue;
 
             }
-        };
 
 
-    } ] );
+            // fieldData[ currentPath ] is string, number, etc.
+
+            // path was last element in paths: Return result
+            if( i === paths.length - 1 ) {
+                result = fieldData[ currentPath ];
+            }
+
+            // path was not last element in paths: path couldn't be found,
+            // return false
+            else {
+                console.log( 'string not last' );
+                result = false;
+            }
+
+        }
+
+        console.error( "result: %o", result );
+        return result;
+            
+    }
+
+
+} ] ) 
+
+
+
+
+
+
+
+
+/**
+* Renders a date. Requires attributes
+* - data-date-renderer
+* - data-date-format (YYYY, YY, MM, DD, hh, mm, ss)
+* - data-date (some parsable date)
+*/
+.directive( 'dateRenderer', function() {
+
+    return {
+        link: function( $scope, element, attrs ) {
+
+            var format = attrs.dateFormat
+                , date = new Date( attrs.date )
+
+            var tableDate = format
+                .replace( 'YYYY', date.getFullYear() )
+                .replace( 'YY', date.getYear() )
+                .replace( 'MM', date.getMonth() + 1 )
+                .replace( 'DD', date.getDate() )
+
+                .replace( 'hh', pad( date.getHours() ) )
+                .replace( 'mm', pad( date.getMinutes() ) )
+                .replace( 'ss', pad( date.getSeconds() ) )
+    
+            element
+                .empty()
+                .append( tableDate )
+
+            function pad( nr ) {
+                return nr < 10 ? '0' + nr : nr;
+            }
+
+        }
+    }
+
+} )
+
+
+
+
+
+/**
+* Template for table
+*/
+.run( function( $templateCache ) {
+
+    $templateCache.put( 'datatableTemplate.html', 
+          '<table class=\'table\'>'
+        + '<thead>'
+        + '<tr>'
+        + '<th data-ng-repeat=\'label in labels\'>{{label}}</th>'
+        + '</tr>'
+        + '</thead>'
+        + '<tbody data-datatable-body>'
+        + '</tbody>'
+        + '</table>'
+    )
+
+    $templateCache.put( 'datatableRowTemplate.html', 
+          '<tr data-datatable-row></tr>'
+    )
+
+    $templateCache.put( 'datatableCellTemplate.html', 
+          '<td data-datatable-cell>'
+        + '</td>'
+    )
+
+} );
