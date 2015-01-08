@@ -386,17 +386,35 @@ angular
 	// Returns an array of the relevant rows
 	function getSelectFromFields() {
 		
-		var select = [];
+		// Always select * 
+		// as translations are mapped directly to the root entity, but
+		// but selecting them with the select headers returns a 500 error
+		// like e.g. [object] column object.title does not exist
+		var select = [ '*' ];
 
 		// Use loop instead of forEach because of continue
 		for( var i = 0; i < self.fields.length; i++ ) {
 
 			var field = self.fields[ i ];
 
-			if( !field || !field.selector || !angular.isString( field.selector ) ) {
+			// Explicit select statement in field
+			if( field.select ) {
+				select.push( field.select );
 				continue;
 			}
 
+			if( !field.selector || !angular.isString( field.selector ) ) {
+				continue;
+			}
+
+			// If selector doesn't access sub-entities, the necessary fields
+			// are already included in '*'
+			if( field.selector.indexOf( '.' ) === -1 ) {
+				continue;
+			}
+
+			// Remove array accessors (e.g. [0] through .0.); 
+			// see getDataByField on tableCell
 			var rowName = field.selector.replace( /\.\d+\./gi, '.' );
 			select.push( rowName );
 

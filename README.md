@@ -3,8 +3,8 @@ The angular datatable directive for fluffy back offices.
 #Features
 
 - Sort, pagination, search (only by one column for now)
-- Chose from predefined filters (e.g. «All articles with a price > $100»)
-- Auto-detects the fields for the select header
+- Set predefined filters (e.g. «All articles with a price > $100»)
+- Auto-detects the fields for the select header (* plus all sub-entities through field.selector or field.select)
 
 #Installation
 
@@ -55,6 +55,15 @@ Plugin requires eb-api-wrapper and, of course, angular.
         // Pass a function; it's return value will be displayed in the
         // cell
         , content       : renderEditCell
+    }, {
+        title           : 'Description'
+        // Truncate text
+        , content       : function( data ) {
+            return data.subentity.description.substring( 0, 100 ) + '…'
+        }
+        // Add subentity to the select statement as it's used in the
+        // content function but may not be auto detected
+        , select        : 'subentity.*'
     }
 ]
  
