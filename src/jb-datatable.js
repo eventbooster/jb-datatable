@@ -143,6 +143,7 @@ angular
 
 
     scope.sortTable = function( field ) {
+        console.log( 'Datatable: sort table by %o', field );
         // Sort by field that's already sorted by: 
         // Switch order
         if( self.sortField === field ) {
@@ -163,9 +164,8 @@ angular
     $attrs.$observe( function() {
         return $scope.$parent.$eval( $attrs.endpoint ) + $scope.$parent.$eval( $attrs.filter ) + $scope.$parent.$eval( $attrs.order ) + $scope.$parent.$eval( $attrs.fields );
     }, function( newVal ) {
-
+        console.log( 'Datatable: endpoint, filter, order or fields changed' );
         self.getData();
-
     } );
 
 
@@ -190,6 +190,7 @@ angular
     // Filter changed on datatableWithFilters: Update data
     $scope.$on( 'filter', function( ev, args ) {
         self.filter = args.filter ? args.filter : undefined;
+        console.log( 'Datatable; filter event cought.' );
         self.getData();
     } );
 
@@ -202,6 +203,7 @@ angular
     // Search term changed in datatableWithFiltersController
     $scope.$on( 'search', function( ev, args ) {
         self.searchTerm = args.searchTerm;
+        console.log( 'Datatable: search term change cought' );
         self.getData();
     } );
 
@@ -234,6 +236,7 @@ angular
 
         if( self.currentPage + direction > -1 ) {
             self.currentPage += direction;
+            console.log( 'Datatable: change page' );
             self.getData();
         }
 
@@ -268,6 +271,8 @@ angular
     * Gets data from server
     */
     this.getData = function() {
+
+        console.error( 'gd' );
 
         scope.loading = true;
 
@@ -862,7 +867,12 @@ angular
 
     $templateCache.put( 'datatableWithFiltersTemplate.html',
         '<form class=\'form-inline\'>' +
-            '<input type=\'text\' class=\'form-control\' data-ng-model=\'filters.search\' />' +
+            '<div class=\'form-group\'>' +
+                '<div class=\'input-group\'>' +
+                    '<div class=\'input-group-addon\'><div style=\'transform:rotate(45deg) scale(1.5)\'>&#9906;</div></div>' + 
+                    '<input type=\'text\' id=\'datatable-search-input\' class=\'form-control\' data-ng-model=\'filters.search\' />' +
+                '</div>' +
+            '</div>' +
             '<select data-ng-show=\'filterList && filterList.length > 0\' name=\'datatable-filter-select\' class=\'form-control\' data-ng-model=\'filters.filter\' data-ng-options=\'filter.filter as filter.name for filter in filterList\'></select>' +
             '<div data-ng-transclude></div>' +
         '</form>'
