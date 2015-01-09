@@ -915,8 +915,8 @@ angular
 	$templateCache.put( 'datatableTemplate.html',
 
 		// Progress
-		'<div class=\'progress\' data-ng-if=\'loading\'>' +
-			'<div class=\'progress-bar progress-bar-striped active\' role=\'progressbar\' style=\'width:100%\'></div>' +
+		'<div class=\'progress progress-striped active\' data-ng-if=\'loading\'>' +
+			'<div class=\'progress-bar\' role=\'progressbar\' style=\'width:100%\'></div>' +
 		'</div>' +
 
 		// Table
