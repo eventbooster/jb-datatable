@@ -44,12 +44,12 @@ angular
 
 	// Broadcast new searchTerm to table
 	$scope.$watch( 'filters.search', function( newValue ) {
-		$scope.$broadcast( 'search', { searchTerm: newValue } );
+		$scope.$broadcast( 'datatableSearch', { searchTerm: newValue } );
 	} );
 
 	// Broadcast filter change to table
 	$scope.$watch( 'filters.filter', function( newValue ) {
-		$scope.$broadcast( 'filter', { filter: newValue } );
+		$scope.$broadcast( 'datatableFilter', { filter: newValue } );
 	} );
 
 
@@ -61,6 +61,11 @@ angular
 		$scope.filterList = $scope.$parent.$eval( $attrs.filterList );
 	} );
 
+
+	$scope.loading = false;
+	$scope.$on( 'datatableLoading', function( ev, args ) {
+		$scope.loading = args.loading === false ? false : true;
+	} );
 
 
 } ] )
@@ -188,7 +193,7 @@ angular
 
 
 	// Filter changed on datatableWithFilters: Update data
-	$scope.$on( 'filter', function( ev, args ) {
+	$scope.$on( 'datatableFilter', function( ev, args ) {
 
 		// No change in filter: Don't make a request 
 		if( self.filter == args.filter ) {
@@ -207,7 +212,7 @@ angular
 
 
 	// Search term changed in datatableWithFiltersController
-	$scope.$on( 'search', function( ev, args ) {
+	$scope.$on( 'datatableSearch', function( ev, args ) {
 
 		// Term didn't change: No need for making a request
 		if( self.searchTerm == args.searchTerm ) {
@@ -291,7 +296,12 @@ angular
 			return;
 		}
 
+
 		scope.loading = true;
+
+		// Emit to filter/search directive (to hide it)
+		scope.$emit( 'datatableLoading', { loading: true } );
+
 
 		// Generate headers
 		var headers     = {};
@@ -359,6 +369,7 @@ angular
 
 			console.log( 'Datatable: Set tableData to %o', data );
 			scope.loading = false;
+			scope.$emit( 'datatableLoading', { loading: false } );
 
 			// Set hasMoreResults
 			self.hasMoreResults = data.length > self.resultsPerPage ? true : false;
@@ -901,7 +912,7 @@ angular
 
 	$templateCache.put( 'datatableWithFiltersTemplate.html',
 		'<form class=\'form-inline\'>' +
-			'<div class=\'form-group\'>' +
+			'<div class=\'form-group\' data-ng-if=\'!loading\'>' +
 				'<div class=\'input-group\'>' +
 					'<div class=\'input-group-addon\'><div style=\'transform:rotate(45deg) scale(1.5)\'>&#9906;</div></div>' + 
 					'<input type=\'text\' id=\'datatable-search-input\' class=\'form-control\' data-ng-model=\'filters.search\' />' +
