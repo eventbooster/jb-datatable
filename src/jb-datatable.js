@@ -912,7 +912,7 @@ angular
 
 	$templateCache.put( 'datatableWithFiltersTemplate.html',
 		'<form class=\'form-inline\'>' +
-			'<div class=\'form-group\' data-ng-if=\'!loading\'>' +
+			'<div class=\'form-group\'>' +
 				'<div class=\'input-group\'>' +
 					'<div class=\'input-group-addon\'><div style=\'transform:rotate(45deg) scale(1.5)\'>&#9906;</div></div>' + 
 					'<input type=\'text\' id=\'datatable-search-input\' class=\'form-control\' data-ng-model=\'filters.search\' />' +
