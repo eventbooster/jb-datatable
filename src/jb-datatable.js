@@ -332,7 +332,11 @@ angular
 				var searchFields = [];
 				for( var i = 0; i < self.fields.length; i++ ) {
 					if( self.fields[ i ].searchable && self.fields[ i ].selector ) {
-						searchFields.push( self.fields[ i ].selector );
+						var fieldSelector	= self.fields[ i ].selector
+							// Remove array selectors from selector
+							// eventData.0.name -> eventData.name
+							, fieldPath		= fieldSelector.replace( /\.\d*\./gi, '.')
+						searchFields.push( fieldPath );
 					}
 				}
 
