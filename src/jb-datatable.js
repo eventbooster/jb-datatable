@@ -243,7 +243,7 @@ angular
 		self.resultsPerPage = resultsPerPage;
 
 		// Broadcast down the line (to the navigation controller)
-		scope.$broadcast( "resultsPerPageChange", { resultsPerPage: resultsPerPage } );
+		scope.$broadcast( 'resultsPerPageChange', { resultsPerPage: resultsPerPage } );
 		self.getData();
 	};
 
@@ -850,7 +850,7 @@ angular
 
 	// Needs to be in object for UI binding
 	$scope.paging = {
-		resultsPerPage  : 10
+		resultsPerPage  : '10' // Needs to be a string; if not, correct selection won't be selected in UI
 		, showLeft      : true
 		, showRight     : true
 	};
@@ -883,7 +883,7 @@ angular
 
 		$scope.paging.showRight         = self.datatableController.hasMoreResults;
 		$scope.paging.showLeft          = self.datatableController.currentPage > 0;
-		$scope.paging.resultsPerPage    = self.datatableController.resultsPerPage;
+		$scope.paging.resultsPerPage    = self.datatableController.resultsPerPage + ''; // Needs to be a string
 
 	} );
 
@@ -964,7 +964,7 @@ angular
 			'<form class=\'form-inline\' data-ng-if=\'tableData\'>' + // Needed for bootstrap inline form
 				'<button class=\'btn btn-link\' data-ng-click=\'changePage(-1)\' data-ng-show=\'paging.showLeft\'>&larr;</button>' +
 				'<button class=\'btn btn-link\' data-ng-click=\'changePage(1)\' data-ng-show=\'paging.showRight\'>&rarr;</button>' +
-				'<select name=\'resultsPerPage\' data-ng-model=\'paging.resultsPerPage\' class=\'form-control input-sm\'><option>10</option><option>25</option><option>50</option><option>100</option></select>' +
+				'<select name=\'resultsPerPage\' data-ng-model=\'paging.resultsPerPage\' class=\'form-control input-sm\'><option value=\'10\'>10</option><option value=\'25\'>25</option><option value=\'50\'>50</option><option value=\'100\'>100</option></select>' +
 			'</form>' +
 		'</nav>'
 
