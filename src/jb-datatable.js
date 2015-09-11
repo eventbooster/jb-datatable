@@ -4,7 +4,7 @@
 	'use strict';
 
 	angular
-	.module( 'jb.datatable', [ 'eb.apiWrapper' ] )
+	.module( 'jb.datatable', [ 'jb.apiWrapper' ] )
 
 
 
