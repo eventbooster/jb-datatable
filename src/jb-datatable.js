@@ -455,7 +455,7 @@
 					filters.push( self.filter );
 				}
 
-				headers.filter = filters.join( ' AND ' );
+				headers.filter = filters.join( ' , ' );
 
 			}
 
