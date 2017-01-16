@@ -548,10 +548,10 @@
 		/**
 		* Returns true if table can be ordered by column: 
 		* - selector needs to be set
-		* - selector may contain no dots
+		* - only one selector may be used (not multiple, separated by comma)
 		*/
 		$scope.isColumnOrderable = function( selector ) {
-			return selector && selector.indexOf( '.' ) === -1;
+			return selector && selector.indexOf( ',' ) === -1;
 		};
 
 		/**
