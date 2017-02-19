@@ -47,9 +47,11 @@ Plugin requires eb-api-wrapper and, of course, angular.
     }, {
         title           : 'First Tag'
         // A more complex path; returns row['tags'][0]['name']
-        , selector      : tags.0.name
+        , selector      : 'tags.0.name'
         // Set searchable to true if column should be searchable
         , searchable    : true
+        , fulltextEnabled : true
+        , fulltextSelector : 'testSearch.document'
     }, {
         title           : 'Edit'
         // Pass a function; it's return value will be displayed in the
