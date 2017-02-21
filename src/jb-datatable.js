@@ -337,8 +337,13 @@
 
       self.searchTerm = searchTerm;
       console.log( 'DatatableController: Search term change caught; new %o', self.searchTerm );
-      self.getData();
 
+
+      // debounce
+      if (self.searchTermTimer) clearTimeout(self.searchTermTimer);
+      self.searchTermTimer = setTimeout(function() {
+          self.getData();
+      }, 300);
     };
 
 
