@@ -458,11 +458,12 @@
             var filterStatement;
 
             if(firstDefinition.fulltextEnabled){
+              // Rüfe! Docs!
               var searchTerms = self.searchTerm.trim().split(/\s+/).map(function(item){ return "'" + item + "'"});
               searchQuery = "fulltext(" + searchTerms.join(' , ') + ")";
               searchField = firstDefinition.fulltextSelector;
             }
-            filterStatement = ';;' + [searchField, searchQuery].join(' = ');
+            filterStatement = [searchField, searchQuery].join(' = ');
             filters.push( filterStatement );
           }
         }
@@ -472,7 +473,10 @@
           filters.push( self.filter );
         }
 
-        headers.filter = filters.join( ' , ' );
+        console.log('DatatableController: filters are %o', filters);
+        var filterString = ';;' + encodeURIComponent(filters.join(','));
+
+        headers.filter = filterString;
 
       }
 
