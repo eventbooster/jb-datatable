@@ -474,7 +474,8 @@
         }
 
         console.log('DatatableController: filters are %o', filters);
-        var filterString = ';;' + encodeURIComponent(filters.join(','));
+        // Only add ;; and encode if filters are set
+        var filterString = filters && filters.length ? ';;' + encodeURIComponent(filters.join(',')) : '';
 
         headers.filter = filterString;
 
