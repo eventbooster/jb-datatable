@@ -453,7 +453,7 @@
             console.warn( 'DatatableController: No search columsn found; make sure the searchable property is defined on at least one field definition' );
           } else {
             var firstDefinition = searchFieldDefinitions[0];
-            var searchQuery = "like(%"+self.searchTerm+"%)";
+            var searchQuery = "like('%"+self.searchTerm+"%')";
             var searchField = firstDefinition.selector;
             var filterStatement;
 
