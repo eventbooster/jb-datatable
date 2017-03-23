@@ -443,7 +443,7 @@
                 // eventData.0.name -> eventData.name
                 , fieldPath		= fieldSelector.replace( /\.\d*\./gi, '.');
               searchFields.push(fieldPath);
-              searchFieldDefinitions.push(currentField)
+              searchFieldDefinitions.push(currentField);
             }
           }
 
@@ -453,13 +453,13 @@
             console.warn( 'DatatableController: No search columsn found; make sure the searchable property is defined on at least one field definition' );
           } else {
             var firstDefinition = searchFieldDefinitions[0];
-            var searchQuery = "like('" + encodeURIComponent("%"+self.searchTerm+"%") + "')";
+            var searchQuery = "like(%"+self.searchTerm+"%)";
             var searchField = firstDefinition.selector;
             var filterStatement;
 
             if(firstDefinition.fulltextEnabled){
               // Rüfe! Docs!
-              var searchTerms = self.searchTerm.trim().split(/\s+/).map(function(item){ return "'" + item + "'"});
+              var searchTerms = self.searchTerm.trim().split(/\s+/).map(function(item){ return "'" + item + "'"; });
               searchQuery = "fulltext(" + searchTerms.join(' , ') + ")";
               searchField = firstDefinition.fulltextSelector;
             }
