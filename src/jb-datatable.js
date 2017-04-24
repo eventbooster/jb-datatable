@@ -432,29 +432,29 @@
         if( self.searchTerm ) {
 
           // Get fields that may be used for search
-          var searchFields = [];
           var searchFieldDefinitions = [];
 
           for( var i = 0; i < self.fields.length; i++ ) {
             var currentField = self.fields[i];
             if( currentField.searchable && currentField.selector ) {
-              var fieldSelector	= currentField.selector
-                // Remove array selectors from selector
-                // eventData.0.name -> eventData.name
-                , fieldPath		= fieldSelector.replace( /\.\d*\./gi, '.');
-              searchFields.push(fieldPath);
               searchFieldDefinitions.push(currentField);
             }
           }
 
-          console.log( 'DatatableController: searchFields are %o', searchFields );
+          console.log( 'DatatableController: searchFieldDefinitions are %o', searchFieldDefinitions );
 
-          if( searchFields.length === 0 ) {
+          if( searchFieldDefinitions.length === 0 ) {
             console.warn( 'DatatableController: No search columsn found; make sure the searchable property is defined on at least one field definition' );
           } else {
             var firstDefinition = searchFieldDefinitions[0];
             var searchQuery = "like('%"+self.searchTerm+"%')";
-            var searchField = firstDefinition.selector;
+              // If selector for search does not equal selector, we may use searchSelector,
+              // e.g. if selector is 'title' but search has to be performed on 'postLocale.title'
+            var searchField = firstDefinition.searchSelector || firstDefinition.selector;
+              // Remove array selectors from selector
+              // eventData.0.name -> eventData.name
+              searchField = searchField.replace( /\.\d*\./gi, '.');
+
             var filterStatement;
 
             if(firstDefinition.fulltextEnabled){
