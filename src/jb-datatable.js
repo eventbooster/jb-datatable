@@ -1050,7 +1050,7 @@
         '<form class=\'form-inline\' data-ng-if=\'tableData\'>' + // Needed for bootstrap inline form
           '<button class=\'btn btn-link\' data-ng-click=\'changePage(-1)\' data-ng-show=\'paging.showLeft\'>&larr;</button>' +
           '<button class=\'btn btn-link\' data-ng-click=\'changePage(1)\' data-ng-show=\'paging.showRight\'>&rarr;</button>' +
-          '<select name=\'resultsPerPage\' data-ng-model=\'paging.resultsPerPage\' class=\'form-control input-sm\'><option value=\'10\'>10</option><option value=\'25\'>25</option><option value=\'50\'>50</option><option value=\'100\'>100</option></select>' +
+          '<select name=\'resultsPerPage\' data-ng-model=\'paging.resultsPerPage\' class=\'form-control input-sm\'><option value=\'10\'>10</option><option value=\'25\'>25</option><option value=\'50\'>50</option><option value=\'100\'>100</option><option value=\'500\'>500 (careful!)</option></select>' +
         '</form>' +
       '</nav>'
 
